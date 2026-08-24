@@ -19,7 +19,7 @@ public class BoosterService extends Service {
     private static final String CHANNEL_ID = "audio_booster";
     private static final int NOTIFICATION_ID = 1001;
     private LoudnessEnhancer enhancer;
-    private int gainMb = 600;
+    private int gainMb = 1200;
 
     @Override
     public void onCreate() {
@@ -32,7 +32,7 @@ public class BoosterService extends Service {
         if (intent == null || intent.getAction() == null) return START_NOT_STICKY;
 
         String action = intent.getAction();
-        if (intent.hasExtra(EXTRA_GAIN)) gainMb = Math.max(0, Math.min(1200, intent.getIntExtra(EXTRA_GAIN, 600)));
+        if (intent.hasExtra(EXTRA_GAIN)) gainMb = Math.max(0, Math.min(2400, intent.getIntExtra(EXTRA_GAIN, 1200)));
 
         if (ACTION_ENABLE.equals(action)) {
             startForeground(NOTIFICATION_ID, buildNotification("Ativando booster..."));
@@ -59,7 +59,6 @@ public class BoosterService extends Service {
     private void enableBooster() {
         disableBooster();
         try {
-            // Session 0 requests processing on the global output mix. Some Android/OEM builds reject it.
             enhancer = new LoudnessEnhancer(0);
             enhancer.setTargetGain(gainMb);
             enhancer.setEnabled(true);
@@ -90,7 +89,7 @@ public class BoosterService extends Service {
         Intent open = new Intent(this, MainActivity.class);
         PendingIntent pi = PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(this, CHANNEL_ID) : new Notification.Builder(this);
-        return b.setContentTitle("Audio Booster")
+        return b.setContentTitle("Audio Booster MAX")
                 .setContentText(text)
                 .setSmallIcon(android.R.drawable.ic_lock_silent_mode_off)
                 .setContentIntent(pi)
