@@ -8,7 +8,6 @@ import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.SeekBar;
@@ -18,7 +17,7 @@ public class MainActivity extends Activity {
     private TextView gainText;
     private TextView statusText;
     private SeekBar gainSeek;
-    private int gainMb = 600;
+    private int gainMb = 1200;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,13 +33,13 @@ public class MainActivity extends Activity {
         root.setPadding(48, 72, 48, 48);
 
         TextView title = new TextView(this);
-        title.setText("Audio Booster");
+        title.setText("Audio Booster MAX");
         title.setTextSize(30);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         root.addView(title);
 
         TextView warning = new TextView(this);
-        warning.setText("Aumente aos poucos. Ganho excessivo pode causar distorção e danificar alto-falantes ou sua audição.");
+        warning.setText("Faixa normal: 0 a +12 dB. Faixa EXTREMA: +12 a +24 dB. Ganho alto pode causar clipping, distorção, danificar alto-falantes e prejudicar a audição.");
         warning.setTextSize(15);
         warning.setPadding(0, 30, 0, 30);
         root.addView(warning);
@@ -50,7 +49,7 @@ public class MainActivity extends Activity {
         root.addView(gainText);
 
         gainSeek = new SeekBar(this);
-        gainSeek.setMax(1200);
+        gainSeek.setMax(2400);
         gainSeek.setProgress(gainMb);
         root.addView(gainSeek, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         updateGainText();
@@ -69,7 +68,7 @@ public class MainActivity extends Activity {
         });
 
         Button enable = new Button(this);
-        enable.setText("LIGAR BOOSTER");
+        enable.setText("LIGAR BOOSTER MAX");
         enable.setTextSize(18);
         enable.setOnClickListener(v -> {
             Intent i = new Intent(this, BoosterService.class);
@@ -98,7 +97,7 @@ public class MainActivity extends Activity {
         root.addView(statusText);
 
         TextView note = new TextView(this);
-        note.setText("Compatibilidade: o Android pode bloquear efeitos globais em alguns aparelhos. Nesse caso o app avisará e não forçará alterações inseguras.");
+        note.setText("Compatibilidade: alguns aparelhos limitam ou bloqueiam efeitos globais. +24 dB é o valor solicitado ao efeito; o ganho real pode ser menor dependendo do hardware e do Android.");
         note.setTextSize(13);
         note.setPadding(0, 30, 0, 0);
         root.addView(note);
@@ -107,6 +106,7 @@ public class MainActivity extends Activity {
     }
 
     private void updateGainText() {
-        gainText.setText(String.format("Ganho: +%.1f dB", gainMb / 100.0));
+        String zone = gainMb > 1200 ? "  •  EXTREMO" : "";
+        gainText.setText(String.format("Ganho: +%.1f dB%s", gainMb / 100.0, zone));
     }
 }
