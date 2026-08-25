@@ -1,154 +1,85 @@
 package br.com.vivamulher.app;
 
+import android.Manifest;
 import android.app.*;
 import android.content.*;
+import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.location.Location;
+import android.location.LocationManager;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.*;
 import android.widget.*;
 import org.json.*;
-import java.text.*;
+import java.io.File;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class MainActivity extends Activity {
-    private static final int RED = Color.rgb(201,20,53), BLUE = Color.rgb(17,85,204);
-    private static final int BLACK = Color.rgb(16,16,20), SOFT = Color.rgb(245,246,250);
-    private LinearLayout page, content;
-    private final ArrayList<Report> reports = new ArrayList<>();
-    private android.content.SharedPreferences prefs;
+    private static final int RED=Color.rgb(201,20,53), BLUE=Color.rgb(17,85,204), INK=Color.rgb(24,24,30);
+    private static final int REQ_PHOTO=40, REQ_SAFETY=41;
+    private final ArrayList<Report> reports=new ArrayList<>();
+    private SharedPreferences prefs;
+    private LinearLayout root,content;
+    private ScrollView scroll;
+    private int themeIndex;
+    private ImageView headerAvatar;
+    private MediaRecorder recorder;
+    private File audioFile;
+    private boolean recording;
+    private final Theme[] themes={
+        new Theme("Branco",0xFFF7F7FB,""),new Theme("Areia",0xFFF3EBDD,""),new Theme("Cinza",0xFFE8EBF0,""),new Theme("Rosa suave",0xFFFFE9EE,""),new Theme("Azul suave",0xFFE8F1FF,""),
+        new Theme("Flores",0xFFFFEEF4,"🌸  🌼  🌷"),new Theme("Folhas",0xFFEDF7ED,"🍃  🌿  🍀"),new Theme("Ursinhos",0xFFFFF0DF,"🧸  🧸  🧸"),new Theme("Borboletas",0xFFF1EDFF,"🦋  ✨  🦋"),new Theme("Corações",0xFFFFE9F0,"💗  🤍  💙")};
 
-    @Override public void onCreate(Bundle state) {
-        super.onCreate(state);
-        prefs = getSharedPreferences("viva_mulher", MODE_PRIVATE);
-        load();
-        showWelcome();
-    }
+    @Override public void onCreate(Bundle b){super.onCreate(b);prefs=getSharedPreferences("viva_mulher",MODE_PRIVATE);themeIndex=prefs.getInt("theme",0);load();if(prefs.getBoolean("accepted",false))build();else welcome();}
+    private void welcome(){ScrollView s=new ScrollView(this);LinearLayout b=col(24);b.setGravity(Gravity.CENTER_HORIZONTAL);s.addView(b);b.addView(txt("🤝",68,RED,true));b.addView(txt("Viva Mulher",36,INK,true));b.addView(txt("Uma rede de cuidado e informação",18,BLUE,false));b.addView(gap(18));b.addView(note("Relatos são percepções pessoais e não comprovam crimes. Não publique fotos, endereço, telefone ou acusações. Em perigo imediato, ligue 190."));CheckBox ok=new CheckBox(this);ok.setText("Li e concordo com o uso responsável.");ok.setTextSize(17);b.addView(ok,wrap());Button go=btn("Começar",RED);go.setEnabled(false);ok.setOnCheckedChangeListener((x,c)->go.setEnabled(c));go.setOnClickListener(v->{prefs.edit().putBoolean("accepted",true).apply();build();});b.addView(go,full(68));setContentView(s);}
+    private void build(){root=col(0);root.setBackgroundColor(themes[themeIndex].color);root.addView(header(),full(110));scroll=new ScrollView(this);content=col(16);scroll.addView(content);root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));root.addView(nav(),full(78));setContentView(root);home();}
+    private View header(){LinearLayout h=new LinearLayout(this);h.setPadding(16,12,14,10);h.setGravity(Gravity.CENTER_VERTICAL);h.setBackgroundColor(RED);headerAvatar=new ImageView(this);headerAvatar.setScaleType(ImageView.ScaleType.CENTER_CROP);loadPhoto(headerAvatar);h.addView(headerAvatar,new LinearLayout.LayoutParams(68,68));LinearLayout title=col(0);title.setPadding(12,0,4,0);title.addView(txt("Viva Mulher",25,Color.WHITE,true));title.addView(txt(prefs.getString("nickname","Sua rede segura"),14,Color.WHITE,false));h.addView(title,new LinearLayout.LayoutParams(0,-2,1));Button panic=btn("PÂNICO",Color.rgb(120,0,20));panic.setTextSize(16);panic.setOnClickListener(v->panic());h.addView(panic,new LinearLayout.LayoutParams(112,70));return h;}
+    private View nav(){LinearLayout n=new LinearLayout(this);n.setBackgroundColor(INK);String[] names={"⌂\nInício","＋\nAvaliar","⌕\nBuscar","♥\nAprender","☺\nPerfil"};View.OnClickListener[] ls={v->home(),v->form(),v->search(),v->learn(),v->profile()};for(int i=0;i<names.length;i++){Button b=btn(names[i],INK);b.setTextSize(12);b.setOnClickListener(ls[i]);n.addView(b,new LinearLayout.LayoutParams(0,-1,1));}return n;}
 
-    private void showWelcome() {
-        if (prefs.getBoolean("accepted", false)) { buildApp(); return; }
-        ScrollView scroll = new ScrollView(this);
-        LinearLayout box = column(24); box.setGravity(Gravity.CENTER_HORIZONTAL); scroll.addView(box);
-        TextView logo = label("🤝", 64, RED); box.addView(logo);
-        box.addView(label("Viva Mulher", 34, BLACK, true));
-        box.addView(label("Segurança compartilhada em cada caminho", 18, BLUE));
-        box.addView(space(20));
-        box.addView(cardText("Este aplicativo registra percepções de segurança em corridas. As notas não comprovam crimes e não substituem a polícia nem os recursos de segurança da plataforma de transporte."));
-        box.addView(cardText("Use informações verdadeiras. Não publique acusações, documentos, endereço, telefone ou fotografia do motorista."));
-        CheckBox agree = new CheckBox(this); agree.setText("Li e concordo com o uso responsável e com o armazenamento local neste aparelho."); agree.setTextSize(16); box.addView(agree, matchWrap());
-        Button start = button("COMEÇAR", RED); start.setEnabled(false); agree.setOnCheckedChangeListener((b,c)->start.setEnabled(c));
-        start.setOnClickListener(v->{ prefs.edit().putBoolean("accepted",true).apply(); buildApp(); }); box.addView(start, match(58));
-        setContentView(scroll);
-    }
+    private void home(){clear();pattern();LinearLayout composer=card();composer.addView(txt("Como foi sua última corrida?",20,INK,true));composer.addView(txt("Compartilhe uma avaliação de segurança com responsabilidade.",15,Color.DKGRAY,false));Button add=btn("＋  Avaliar motorista",BLUE);add.setOnClickListener(v->form());composer.addView(add,full(64));content.addView(composer);content.addView(section("Ranking semanal de atenção"));ArrayList<Report> week=new ArrayList<>();long cutoff=System.currentTimeMillis()-7L*24*60*60*1000;for(Report r:reports)if(r.time>=cutoff)week.add(r);week.sort(Comparator.comparingInt(r->r.score));if(week.isEmpty())content.addView(note("Nenhuma avaliação registrada nos últimos sete dias neste aparelho."));for(int i=0;i<Math.min(5,week.size());i++)content.addView(post(week.get(i)));content.addView(note("🌐 A lista comunitária entre todas as usuárias aparecerá aqui quando o servidor com login, moderação e canal de contestação estiver ativado."));content.addView(section("No feed esta semana"));content.addView(article("Direito em destaque","A Lei Maria da Penha reconhece formas de violência física, psicológica, sexual, patrimonial e moral.","⚖️"));content.addView(article("Mulher que fez história","Bertha Lutz foi cientista e uma das principais articuladoras dos direitos políticos das mulheres no Brasil.","👩‍🔬"));}
+    private void form(){clear();pattern();content.addView(section("Nova avaliação"));Spinner company=new Spinner(this);company.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"Uber","99","inDrive","Maxim","Outro"}));content.addView(field("Aplicativo",company));EditText name=input("Primeiro nome do motorista",InputType.TYPE_CLASS_TEXT),plate=input("Placa — exemplo ABC1D23",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);content.addView(name,full(66));content.addView(plate,full(66));TextView value=txt("5 — atenção",21,Color.rgb(210,110,0),true);content.addView(value);SeekBar bar=new SeekBar(this);bar.setMax(9);bar.setProgress(4);content.addView(bar,full(66));bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar b,int p,boolean f){int s=p+1;value.setText(s+" — "+level(s));value.setTextColor(scoreColor(s));}public void onStartTrackingTouch(SeekBar b){}public void onStopTrackingTouch(SeekBar b){}});CheckBox real=new CheckBox(this);real.setText("Confirmo que vivi esta experiência e não incluí acusações.");real.setTextSize(16);content.addView(real);Button save=btn("Salvar avaliação",RED);save.setOnClickListener(v->{String p=plate.getText().toString().replaceAll("[^A-Za-z0-9]","").toUpperCase(Locale.ROOT),nm=name.getText().toString().trim();if(p.length()!=7||nm.length()<2||!real.isChecked()){toast("Preencha nome, placa válida e confirmação.");return;}reports.add(new Report(company.getSelectedItem().toString(),nm,p,bar.getProgress()+1,System.currentTimeMillis()));saveReports();toast("Avaliação salva.");home();});content.addView(save,full(72));}
+    private void search(){clear();pattern();content.addView(section("Buscar motorista"));EditText plate=input("Digite a placa completa",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS);content.addView(plate,full(68));Button go=btn("Pesquisar",BLUE);content.addView(go,full(68));LinearLayout result=col(8);content.addView(result);go.setOnClickListener(v->{result.removeAllViews();String q=plate.getText().toString().replaceAll("[^A-Za-z0-9]","").toUpperCase(Locale.ROOT);int n=0;for(Report r:reports)if(r.plate.equals(q)){result.addView(post(r));n++;}if(n==0)result.addView(note("Nenhum relato encontrado neste aparelho. A consulta comunitária dependerá da ativação do servidor."));});}
+    private void learn(){clear();pattern();content.addView(section("Direitos e conceitos"));content.addView(article("Lei Maria da Penha","Prevê prevenção e proteção contra violência doméstica e familiar, incluindo medidas protetivas de urgência.","⚖️"));content.addView(article("Violência psicológica","Ameaçar, constranger, humilhar, manipular ou controlar de modo que prejudique a saúde psicológica e a autonomia pode configurar violência psicológica.","🧠"));content.addView(article("Importunação sexual","Praticar ato de natureza sexual sem consentimento, para satisfazer desejo próprio ou de outra pessoa, é crime.","🛑"));content.addView(article("Perseguição — stalking","Perseguir repetidamente, ameaçar integridade, restringir locomoção ou invadir liberdade e privacidade é crime.","👁"));content.addView(article("Misoginia","É aversão, desprezo ou preconceito contra mulheres. Pode aparecer em falas, instituições, controle, exclusão e violência.","📖"));content.addView(article("Patriarcado","Conceito histórico e social usado para analisar estruturas que concentraram autoridade, propriedade e poder político nos homens.","🏛"));content.addView(section("Mulher da semana"));content.addView(article("Maria da Penha Maia Fernandes","Sua luta por justiça tornou-se símbolo do enfrentamento à violência doméstica e deu nome à lei brasileira de proteção às mulheres.","🌺"));content.addView(note("Conteúdo educativo geral; não substitui orientação jurídica. Emergência: Polícia Militar 190. Central de Atendimento à Mulher: 180."));}
+    private void profile(){clear();pattern();content.addView(section("Meu perfil"));ImageView photo=new ImageView(this);photo.setScaleType(ImageView.ScaleType.CENTER_CROP);loadPhoto(photo);content.addView(photo,full(180));Button choose=btn("Escolher foto do celular",BLUE);choose.setOnClickListener(v->{Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);i.addCategory(Intent.CATEGORY_OPENABLE);i.setType("image/*");startActivityForResult(i,REQ_PHOTO);});content.addView(choose,full(66));EditText nick=input("Nome ou apelido",InputType.TYPE_CLASS_TEXT);nick.setText(prefs.getString("nickname",""));content.addView(nick,full(66));EditText bio=input("Descrição opcional",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);bio.setSingleLine(false);bio.setMinLines(3);bio.setText(prefs.getString("bio",""));content.addView(bio,full(112));Button save=btn("Salvar perfil",RED);save.setOnClickListener(v->{prefs.edit().putString("nickname",nick.getText().toString().trim()).putString("bio",bio.getText().toString().trim()).apply();build();});content.addView(save,full(68));content.addView(section("Aparência — 10 opções"));for(int i=0;i<themes.length;i++){final int idx=i;Button t=btn((i==themeIndex?"✓  ":"")+themes[i].name+"  "+themes[i].pattern,Color.rgb(70,70,82));t.setOnClickListener(v->{themeIndex=idx;prefs.edit().putInt("theme",idx).apply();build();});content.addView(t,full(62));}content.addView(section("Contatos de emergência"));EditText[] phones=new EditText[3];for(int i=0;i<3;i++){phones[i]=input("Telefone de emergência "+(i+1),InputType.TYPE_CLASS_PHONE);phones[i].setText(prefs.getString("phone"+i,""));content.addView(phones[i],full(64));}Button contacts=btn("Salvar contatos",BLUE);contacts.setOnClickListener(v->{SharedPreferences.Editor e=prefs.edit();for(int i=0;i<3;i++)e.putString("phone"+i,phones[i].getText().toString().replaceAll("[^0-9+]",""));e.apply();toast("Contatos salvos.");});content.addView(contacts,full(68));}
 
-    private void buildApp() {
-        page = column(0); page.setBackgroundColor(SOFT);
-        page.addView(header(), match(112));
-        content = column(16);
-        ScrollView scroll = new ScrollView(this); scroll.addView(content); page.addView(scroll, new LinearLayout.LayoutParams(-1,0,1));
-        page.addView(nav(), match(66)); setContentView(page); showHome();
-    }
+    private void panic(){new AlertDialog.Builder(this).setTitle("ACIONAR PÂNICO?").setMessage("O app iniciará uma gravação local e preparará uma mensagem com sua localização para os contatos escolhidos. O Android pedirá confirmação para enviar. Para a polícia, será aberta uma ligação para 190.").setNegativeButton("Cancelar",null).setPositiveButton("Acionar",(d,w)->requestSafety()).show();}
+    private void requestSafety(){ArrayList<String> m=new ArrayList<>();if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)m.add(Manifest.permission.RECORD_AUDIO);if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)m.add(Manifest.permission.ACCESS_FINE_LOCATION);if(!m.isEmpty()){requestPermissions(m.toArray(new String[0]),REQ_SAFETY);return;}activatePanic();}
+    @Override public void onRequestPermissionsResult(int r,String[] p,int[] g){super.onRequestPermissionsResult(r,p,g);if(r==REQ_SAFETY)activatePanic();}
+    private void activatePanic(){startRecording();String message="🚨 PÂNICO — Preciso de ajuda. Minha localização: "+locationLink()+". Ligue para mim e acione a polícia.";StringBuilder nums=new StringBuilder();for(int i=0;i<3;i++){String p=prefs.getString("phone"+i,"");if(!p.isEmpty()){if(nums.length()>0)nums.append(';');nums.append(p);}}LinearLayout status=col(12);status.addView(txt(recording?"● Gravação iniciada":"Gravação não iniciada — verifique a permissão",16,recording?RED:Color.DKGRAY,true));new AlertDialog.Builder(this).setTitle("Pânico ativado").setView(status).setNeutralButton("Parar gravação",(d,w)->stopRecording()).setNegativeButton("Ligar 190",(d,w)->startActivity(new Intent(Intent.ACTION_DIAL,Uri.parse("tel:190")))).setPositiveButton("Enviar aos contatos",(d,w)->{if(nums.length()==0){toast("Cadastre os três contatos no perfil.");return;}Intent sms=new Intent(Intent.ACTION_SENDTO,Uri.parse("smsto:"+nums));sms.putExtra("sms_body",message);startActivity(sms);}).show();}
+    private void startRecording(){if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED)return;try{audioFile=new File(getExternalFilesDir(null),"alerta-"+System.currentTimeMillis()+".m4a");recorder=new MediaRecorder();recorder.setAudioSource(MediaRecorder.AudioSource.MIC);recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);recorder.setOutputFile(audioFile.getAbsolutePath());recorder.prepare();recorder.start();recording=true;}catch(Exception e){recording=false;}}
+    private void stopRecording(){if(!recording)return;try{recorder.stop();}catch(Exception ignored){}try{recorder.release();}catch(Exception ignored){}recording=false;toast("Áudio salvo no aplicativo.");}
+    private String locationLink(){if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return "localização indisponível";try{LocationManager lm=(LocationManager)getSystemService(LOCATION_SERVICE);Location best=null;for(String p:lm.getProviders(true)){Location l=lm.getLastKnownLocation(p);if(l!=null&&(best==null||l.getAccuracy()<best.getAccuracy()))best=l;}if(best!=null)return "https://maps.google.com/?q="+best.getLatitude()+","+best.getLongitude();}catch(Exception ignored){}return "localização ainda indisponível";}
+    @Override protected void onActivityResult(int r,int c,Intent data){super.onActivityResult(r,c,data);if(r==REQ_PHOTO&&c==RESULT_OK&&data!=null&&data.getData()!=null){Uri u=data.getData();try{getContentResolver().takePersistableUriPermission(u,Intent.FLAG_GRANT_READ_URI_PERMISSION);}catch(Exception ignored){}prefs.edit().putString("photo",u.toString()).apply();profile();}}
+    private void loadPhoto(ImageView v){String p=prefs.getString("photo","");if(!p.isEmpty()){try{v.setImageURI(Uri.parse(p));return;}catch(Exception ignored){}}v.setImageResource(android.R.drawable.sym_def_app_icon);v.setBackgroundColor(Color.WHITE);}
 
-    private View header() {
-        LinearLayout h = new LinearLayout(this); h.setPadding(20,18,20,12); h.setGravity(Gravity.CENTER_VERTICAL); h.setBackgroundColor(RED);
-        TextView hand = label("🤝",42,Color.WHITE); h.addView(hand, new LinearLayout.LayoutParams(62,-1));
-        LinearLayout text = column(0); text.addView(label("Viva Mulher",27,Color.WHITE,true)); text.addView(label("Juntas, voltamos mais seguras",14,Color.WHITE)); h.addView(text,new LinearLayout.LayoutParams(0,-2,1));
-        Button emergency = button("SOS", BLACK); emergency.setOnClickListener(v->showEmergency()); h.addView(emergency,new LinearLayout.LayoutParams(88,54)); return h;
-    }
-
-    private View nav() {
-        LinearLayout n = new LinearLayout(this); n.setBackgroundColor(BLACK); n.setPadding(4,4,4,4);
-        n.addView(navButton("⌂\nINÍCIO", v->showHome()), new LinearLayout.LayoutParams(0,-1,1));
-        n.addView(navButton("＋\nAVALIAR", v->showForm()), new LinearLayout.LayoutParams(0,-1,1));
-        n.addView(navButton("⌕\nBUSCAR", v->showSearch()), new LinearLayout.LayoutParams(0,-1,1));
-        n.addView(navButton("☻\nPERFIL", v->showProfile()), new LinearLayout.LayoutParams(0,-1,1)); return n;
-    }
-
-    private void showHome() {
-        clear(); content.addView(title("Como você está se sentindo?"));
-        LinearLayout quick = new LinearLayout(this); quick.setOrientation(LinearLayout.HORIZONTAL);
-        Button danger = button("ESTOU EM PERIGO", RED); danger.setOnClickListener(v->showEmergency()); quick.addView(danger,new LinearLayout.LayoutParams(0,62,1));
-        Button ok = button("CORRIDA SEGURA", BLUE); ok.setOnClickListener(v->showForm()); LinearLayout.LayoutParams qp=new LinearLayout.LayoutParams(0,62,1); qp.setMargins(10,0,0,0); quick.addView(ok,qp); content.addView(quick);
-        content.addView(space(18)); content.addView(title("Maior atenção"));
-        ArrayList<Report> sorted = new ArrayList<>(reports); sorted.sort(Comparator.comparingInt(r->r.score));
-        if(sorted.isEmpty()) content.addView(cardText("Ainda não existem avaliações neste aparelho. Toque em AVALIAR depois de uma corrida."));
-        for(int i=0;i<Math.min(5,sorted.size());i++) content.addView(reportCard(sorted.get(i)));
-        content.addView(space(14)); content.addView(cardText("As classificações representam relatos pessoais. Em risco imediato, procure um local movimentado e ligue para 190."));
-    }
-
-    private void showForm() {
-        clear(); content.addView(title("Avaliar uma corrida"));
-        Spinner company = new Spinner(this); String[] companies={"Uber","99","inDrive","Maxim","Outro"}; company.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,companies)); content.addView(fieldWrap("Aplicativo de transporte",company));
-        EditText name = edit("Primeiro nome do motorista", InputType.TYPE_CLASS_TEXT); content.addView(name,match(58));
-        EditText plate = edit("Placa (ex.: ABC1D23)", InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS); content.addView(plate,match(58));
-        TextView scoreText = label("Nível de segurança: 5 — atenção",18,BLACK,true); content.addView(scoreText);
-        SeekBar score = new SeekBar(this); score.setMax(9); score.setProgress(4); content.addView(score,match(52));
-        score.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){ public void onProgressChanged(SeekBar b,int p,boolean f){int s=p+1;scoreText.setText("Nível de segurança: "+s+" — "+level(s));scoreText.setTextColor(scoreColor(s));} public void onStartTrackingTouch(SeekBar b){} public void onStopTrackingTouch(SeekBar b){} });
-        RadioGroup when = new RadioGroup(this); when.setOrientation(RadioGroup.HORIZONTAL); RadioButton during=radio("Durante a corrida",true), after=radio("Após a corrida",false); when.addView(during); when.addView(after); content.addView(when);
-        CheckBox honest = new CheckBox(this); honest.setText("Confirmo que esta avaliação descreve uma experiência real."); content.addView(honest);
-        Button save=button("SALVAR AVALIAÇÃO",RED); save.setOnClickListener(v->{
-            String p=plate.getText().toString().replaceAll("[^A-Za-z0-9]","").toUpperCase(Locale.ROOT);
-            String nm=name.getText().toString().trim();
-            if(p.length()!=7 || nm.length()<2 || !honest.isChecked()){toast("Preencha primeiro nome, placa válida e confirme a experiência.");return;}
-            reports.add(new Report(company.getSelectedItem().toString(),nm,p,score.getProgress()+1,during.isChecked(),System.currentTimeMillis())); save(); toast("Avaliação salva neste aparelho."); showHome();
-        }); content.addView(save,match(60));
-    }
-
-    private void showSearch() {
-        clear(); content.addView(title("Consultar motorista")); content.addView(cardText("Digite a placa completa. O resultado exibirá a placa mascarada para reduzir exposição indevida."));
-        EditText plate=edit("Placa completa",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS); content.addView(plate,match(60));
-        Button search=button("PESQUISAR",BLUE); content.addView(search,match(58)); LinearLayout results=column(8); content.addView(results);
-        search.setOnClickListener(v->{ results.removeAllViews(); String q=plate.getText().toString().replaceAll("[^A-Za-z0-9]","").toUpperCase(Locale.ROOT); int found=0; for(Report r:reports) if(r.plate.equals(q)){results.addView(reportCard(r));found++;} if(found==0)results.addView(cardText("Nenhuma avaliação encontrada neste aparelho para essa placa.")); });
-    }
-
-    private void showProfile() {
-        clear(); content.addView(title("Meu perfil")); TextView avatar=label(prefs.getString("avatar","🌺"),72,RED); avatar.setGravity(Gravity.CENTER); content.addView(avatar,match(100));
-        EditText nickname=edit("Apelido",InputType.TYPE_CLASS_TEXT); nickname.setText(prefs.getString("nickname","")); content.addView(nickname,match(58));
-        Spinner avatars=new Spinner(this); String[] options={"🌺 Flor","🦋 Borboleta","🐱 Gatinha","🌙 Lua","⭐ Estrela","🌈 Arco-íris"}; avatars.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,options)); content.addView(avatars,match(58));
-        Button saveProfile=button("SALVAR PERFIL",BLUE); saveProfile.setOnClickListener(v->{String a=options[avatars.getSelectedItemPosition()].substring(0,2).trim(); prefs.edit().putString("nickname",nickname.getText().toString().trim()).putString("avatar",a).apply();avatar.setText(a);toast("Perfil salvo.");}); content.addView(saveProfile,match(58));
-        Button clear=button("APAGAR DADOS DESTE APARELHO",BLACK); clear.setOnClickListener(v->new AlertDialog.Builder(this).setTitle("Apagar avaliações?").setMessage("Esta ação remove permanentemente os registros locais.").setNegativeButton("Cancelar",null).setPositiveButton("Apagar",(d,w)->{reports.clear();save();showHome();}).show()); content.addView(clear,match(58));
-        content.addView(cardText("Versão 1.0 — dados armazenados somente neste celular. Nenhuma avaliação é enviada à internet nesta versão."));
-    }
-
-    private void showEmergency() {
-        new AlertDialog.Builder(this).setTitle("Ajuda de emergência").setMessage("Se houver risco imediato, saia do veículo apenas quando for seguro, vá para um local movimentado e acione a polícia. O aplicativo abrirá o discador; confira e toque em ligar.").setNegativeButton("Cancelar",null).setNeutralButton("Avaliar agora",(d,w)->showForm()).setPositiveButton("DISCAR 190",(d,w)->startActivity(new Intent(Intent.ACTION_DIAL, Uri.parse("tel:190")))).show();
-    }
-
-    private View reportCard(Report r) {
-        LinearLayout c=column(8); c.setPadding(16,14,16,14); c.setBackgroundColor(Color.WHITE);
-        LinearLayout top=new LinearLayout(this); TextView badge=label(String.valueOf(r.score),25,Color.WHITE,true); badge.setGravity(Gravity.CENTER); badge.setBackgroundColor(scoreColor(r.score)); top.addView(badge,new LinearLayout.LayoutParams(54,54));
-        LinearLayout detail=column(0); detail.setPadding(12,0,0,0); detail.addView(label(r.company+" • "+r.name,18,BLACK,true)); detail.addView(label(mask(r.plate)+" • "+level(r.score),15,scoreColor(r.score))); top.addView(detail,new LinearLayout.LayoutParams(0,-2,1)); c.addView(top);
-        c.addView(label((r.during?"Registrada durante a corrida":"Registrada após a corrida")+" • "+new SimpleDateFormat("dd/MM/yyyy",Locale.getDefault()).format(new Date(r.time)),13,Color.DKGRAY));
-        LinearLayout.LayoutParams p=matchWrap(); p.setMargins(0,0,0,10); c.setLayoutParams(p); return c;
-    }
-
-    private void save(){JSONArray a=new JSONArray();for(Report r:reports)a.put(r.json());prefs.edit().putString("reports",a.toString()).apply();}
-    private void load(){try{JSONArray a=new JSONArray(prefs.getString("reports","[]"));for(int i=0;i<a.length();i++)reports.add(new Report(a.getJSONObject(i)));}catch(Exception ignored){}}
+    private void clear(){content.removeAllViews();content.setBackgroundColor(themes[themeIndex].color);scroll.scrollTo(0,0);}
+    private void pattern(){if(!themes[themeIndex].pattern.isEmpty()){TextView p=txt(themes[themeIndex].pattern,25,INK,false);p.setGravity(Gravity.CENTER);p.setPadding(0,4,0,10);content.addView(p);}}
+    private LinearLayout card(){LinearLayout c=col(14);c.setBackgroundColor(Color.WHITE);LinearLayout.LayoutParams p=wrap();p.setMargins(0,0,0,12);c.setLayoutParams(p);return c;}
+    private View post(Report r){LinearLayout c=card(),row=new LinearLayout(this);TextView badge=txt(String.valueOf(r.score),25,Color.WHITE,true);badge.setGravity(Gravity.CENTER);badge.setBackgroundColor(scoreColor(r.score));row.addView(badge,new LinearLayout.LayoutParams(58,58));LinearLayout d=col(0);d.setPadding(12,0,0,0);d.addView(txt(r.company+" • "+r.name,19,INK,true));d.addView(txt(mask(r.plate)+" • "+level(r.score),16,scoreColor(r.score),true));row.addView(d,new LinearLayout.LayoutParams(0,-2,1));c.addView(row);c.addView(txt("Relato de segurança • "+new SimpleDateFormat("dd/MM/yyyy",Locale.getDefault()).format(new Date(r.time)),13,Color.DKGRAY,false));return c;}
+    private View article(String title,String body,String icon){LinearLayout c=card();c.addView(txt(icon+"  "+title,20,INK,true));c.addView(txt(body,16,Color.DKGRAY,false));return c;}
+    private TextView section(String s){TextView t=txt(s,23,INK,true);t.setPadding(2,16,0,12);return t;}
+    private TextView note(String s){TextView t=txt(s,16,INK,false);t.setPadding(18,16,18,16);t.setBackgroundColor(Color.WHITE);LinearLayout.LayoutParams p=wrap();p.setMargins(0,0,0,12);t.setLayoutParams(p);return t;}
+    private View field(String s,View v){LinearLayout l=col(0);l.addView(txt(s,14,Color.DKGRAY,true));l.addView(v,full(58));return l;}
+    private EditText input(String h,int type){EditText e=new EditText(this);e.setHint(h);e.setTextSize(17);e.setTextColor(INK);e.setHintTextColor(Color.GRAY);e.setInputType(type);e.setSingleLine(true);e.setPadding(14,4,14,4);return e;}
+    private Button btn(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setTextSize(16);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setAllCaps(false);b.setMinHeight(58);b.setBackgroundTintList(ColorStateList.valueOf(color));return b;}
+    private TextView txt(String s,int z,int c,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(z);t.setTextColor(c);t.setLineSpacing(2,1.05f);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
+    private LinearLayout col(int p){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(p,p,p,p);return l;}
+    private Space gap(int h){Space s=new Space(this);s.setLayoutParams(full(h));return s;}
+    private LinearLayout.LayoutParams full(int h){return new LinearLayout.LayoutParams(-1,h);}
+    private LinearLayout.LayoutParams wrap(){return new LinearLayout.LayoutParams(-1,-2);}
     private String mask(String p){return p.length()==7?p.substring(0,3)+"••"+p.substring(5):"•••••••";}
     private String level(int s){if(s<=2)return "perigo extremo";if(s<=4)return "alto risco percebido";if(s<=6)return "atenção";if(s<=8)return "confiável";return "muito confiável";}
-    private int scoreColor(int s){if(s<=3)return RED;if(s<=6)return Color.rgb(224,126,0);return s<=8?BLUE:Color.rgb(0,125,90);}
-    private void clear(){content.removeAllViews();}
-    private LinearLayout column(int pad){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(pad,pad,pad,pad);return l;}
-    private TextView title(String s){TextView t=label(s,23,BLACK,true);t.setPadding(0,8,0,14);return t;}
-    private TextView label(String s,int size,int color){return label(s,size,color,false);}
-    private TextView label(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
-    private TextView cardText(String s){TextView t=label(s,16,BLACK);t.setPadding(18,16,18,16);t.setBackgroundColor(Color.WHITE);LinearLayout.LayoutParams p=matchWrap();p.setMargins(0,0,0,12);t.setLayoutParams(p);return t;}
-    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setTextSize(14);b.setTypeface(Typeface.DEFAULT,Typeface.BOLD);b.setBackgroundColor(color);return b;}
-    private Button navButton(String s,View.OnClickListener l){Button b=button(s,BLACK);b.setOnClickListener(l);b.setTextSize(11);return b;}
-    private EditText edit(String hint,int type){EditText e=new EditText(this);e.setHint(hint);e.setInputType(type);e.setTextSize(17);e.setSingleLine(true);return e;}
-    private RadioButton radio(String s,boolean checked){RadioButton r=new RadioButton(this);r.setText(s);r.setChecked(checked);return r;}
-    private View fieldWrap(String name,View field){LinearLayout l=column(0);l.addView(label(name,13,Color.DKGRAY,true));l.addView(field,match(52));return l;}
-    private Space space(int h){Space s=new Space(this);s.setLayoutParams(match(h));return s;}
-    private LinearLayout.LayoutParams match(int h){return new LinearLayout.LayoutParams(-1,h);}
-    private LinearLayout.LayoutParams matchWrap(){return new LinearLayout.LayoutParams(-1,-2);}
+    private int scoreColor(int s){if(s<=3)return RED;if(s<=6)return Color.rgb(220,120,0);if(s<=8)return BLUE;return Color.rgb(0,125,90);}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
-
-    static class Report {
-        String company,name,plate; int score; boolean during; long time;
-        Report(String c,String n,String p,int s,boolean d,long t){company=c;name=n;plate=p;score=s;during=d;time=t;}
-        Report(JSONObject o)throws JSONException{this(o.getString("company"),o.getString("name"),o.getString("plate"),o.getInt("score"),o.getBoolean("during"),o.getLong("time"));}
-        JSONObject json(){JSONObject o=new JSONObject();try{o.put("company",company);o.put("name",name);o.put("plate",plate);o.put("score",score);o.put("during",during);o.put("time",time);}catch(Exception ignored){}return o;}
-    }
+    private void saveReports(){JSONArray a=new JSONArray();for(Report r:reports)a.put(r.json());prefs.edit().putString("reports",a.toString()).apply();}
+    private void load(){try{JSONArray a=new JSONArray(prefs.getString("reports","[]"));for(int i=0;i<a.length();i++)reports.add(new Report(a.getJSONObject(i)));}catch(Exception ignored){}}
+    @Override protected void onDestroy(){stopRecording();super.onDestroy();}
+    static class Theme{String name,pattern;int color;Theme(String n,int c,String p){name=n;color=c;pattern=p;}}
+    static class Report{String company,name,plate;int score;long time;Report(String c,String n,String p,int s,long t){company=c;name=n;plate=p;score=s;time=t;}Report(JSONObject o)throws JSONException{this(o.getString("company"),o.getString("name"),o.getString("plate"),o.getInt("score"),o.getLong("time"));}JSONObject json(){JSONObject o=new JSONObject();try{o.put("company",company);o.put("name",name);o.put("plate",plate);o.put("score",score);o.put("time",time);}catch(Exception ignored){}return o;}}
 }
