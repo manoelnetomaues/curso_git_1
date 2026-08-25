@@ -7,7 +7,7 @@ Aplicativo Android local-first para registrar e consultar percepções de segura
 - Android 13 a Android 16 (`minSdk 33`, `targetSdk 36`)
 - Projeto Java sem bibliotecas de terceiros
 
-## Recursos da versão 3
+## Recursos da versão 4
 
 - Cadastro de empresa, primeiro nome do motorista e placa
 - Nota de segurança de 1 (perigo extremo) a 10 (muito confiável)
@@ -27,6 +27,8 @@ Aplicativo Android local-first para registrar e consultar percepções de segura
 - Cidade, estado e país em cada avaliação
 - Totais positivos e negativos e estados com maior ocorrência
 - Dimensões responsivas em dp para respeitar fontes grandes do Android
+- Comando de voz “Estou em perigo” com confirmação visual em botão circular
+- Microfone azul no cabeçalho no lugar do botão de pânico permanente
 
 ## Compilar
 
